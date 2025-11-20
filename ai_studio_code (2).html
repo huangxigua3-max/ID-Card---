@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compact Matrix Card Generator</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #080808;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* 全局禁止滚动 */
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 40px;
+            align-items: center; /* 垂直居中对齐 */
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* --- 左侧控制器 (紧凑版) --- */
+        .controls-panel {
+            width: 340px;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px; /* 模块间距 */
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+
+        /* 标题区 */
+        .panel-header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+        .panel-header p {
+            font-size: 0.75rem;
+            color: #666;
+            margin: 4px 0 0 0;
+        }
+
+        /* 通用分组框 */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .group-label {
+            font-size: 0.65rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        /* 按钮网格 (3列，更紧凑) */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        button.shape-btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #999;
+            padding: 8px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.1s;
+        }
+        button.shape-btn:hover { background: #222; color: #fff; }
+        button.shape-btn.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+            font-weight: 600;
+        }
+
+        /* 滑动条行 */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .slider-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .slider-item span { font-size: 0.6rem; color: #555; }
+        input[type=range] {
+            width: 100%;
+            height: 4px;
+            accent-color: #fff;
+            cursor: pointer;
+        }
+
+        /* 颜色选择器 */
+        .color-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+        .color-dot {
+            width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .color-dot::after {
+            content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px;
+            border-radius: 50%; border: 1px solid #444;
+        }
+        .color-dot:hover { transform: scale(1.1); }
+        .color-dot.active { border-color: white; transform: scale(1.1); z-index: 1; }
+
+        /* 文字输入区域 (网格布局) */
+        .text-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .input-wrapper { display: flex; flex-direction: column; gap: 4px; }
+        .input-wrapper.full { grid-column: span 2; }
+        
+        .text-input {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #eee;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            outline: none;
+            font-family: 'Inter', sans-serif;
+        }
+        .text-input:focus { border-color: #666; background: #222; }
+
+        /* 下载按钮 */
+        .btn-download {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background 0.2s;
+            margin-top: auto; /* 推到底部 */
+        }
+        .btn-download:hover { background: #e0e0e0; }
+
+        /* --- 右侧卡片区域 --- */
+        .card-wrapper {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .card-container {
+            width: 700px; /* 稍微缩小以适应屏幕 */
+            height: 380px;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden; 
+            box-shadow: 0 30px 80px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.5s ease;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; position: absolute; top: 0; left: 0; mix-blend-mode: overlay; }
+
+        .card-content {
+            position: absolute; z-index: 2; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; padding: 40px; box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        .card-badge {
+            background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+            padding: 5px 14px; border-radius: 20px; align-self: flex-start;
+            font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .card-info h2 { font-size: 2.8rem; margin: 0 0 6px 0; font-weight: 500; letter-spacing: -1px; line-height: 1; }
+        .card-info p { margin: 0; opacity: 0.7; font-size: 1rem; font-weight: 300; }
+
+    </style>
+</head>
+<body>
+
+    <div class="main-layout">
+        
+        <!-- 左侧控制面板 (No Scroll) -->
+        <div class="controls-panel">
+            <div class="panel-header">
+                <h1>Card Designer</h1>
+                <p>Customize text, pattern & style.</p>
+            </div>
+
+            <!-- 1. 形状 & 参数 (合并更紧凑) -->
+            <div class="control-group">
+                <div class="group-label">Pattern & Params</div>
+                <div class="btn-grid">
+                    <button onclick="setShape('circle')" id="btn-circle" class="shape-btn active">Circle</button>
+                    <button onclick="setShape('square')" id="btn-square" class="shape-btn">Square</button>
+                    <button onclick="setShape('diamond')" id="btn-diamond" class="shape-btn">Diamond</button>
+                    <button onclick="setShape('funnel')" id="btn-funnel" class="shape-btn">Funnel</button>
+                    <button onclick="setShape('wave')" id="btn-wave" class="shape-btn">Wave</button>
+                    <button onclick="setShape('noise')" id="btn-noise" class="shape-btn">Random</button>
+                </div>
+                
+                <div class="slider-row">
+                    <div class="slider-item">
+                        <span>Density</span>
+                        <input type="range" id="densitySlider" min="15" max="50" value="30">
+                    </div>
+                    <div class="slider-item">
+                        <span>Scale</span>
+                        <input type="range" id="scaleSlider" min="0.5" max="3.0" step="0.1" value="1.0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 颜色 (一行展示) -->
+            <div class="control-group">
+                <div class="group-label">Theme</div>
+                <div class="color-picker">
+                    <div class="color-dot active" style="background: #111;" onclick="setTheme('black', this)"></div>
+                    <div class="color-dot" style="background: #eee;" onclick="setTheme('white', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #f12711, #f5af19);" onclick="setTheme('orange', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #6a11cb, #2575fc);" onclick="setTheme('purple', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #ff00cc, #333399);" onclick="setTheme('cyber', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #00c6ff, #0072ff);" onclick="setTheme('ocean', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #134E5E, #71B280);" onclick="setTheme('forest', this)"></div>
+                    <div class="color-dot" style="background: linear-gradient(135deg, #8E0E00, #1F1C18);" onclick="setTheme('crimson', this)"></div>
+                </div>
+            </div>
+
+            <!-- 3. 文字 (使用 Grid 布局节省垂直空间) -->
+            <div class="control-group">
+                <div class="group-label">Content</div>
+                <div class="text-grid">
+                    <div class="input-wrapper">
+                        <input type="text" class="text-input" id="inputBadge" value="Bytedance" placeholder="Badge">
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="text" class="text-input" id="inputName" value="Xiaoqin Huang" placeholder="Name">
+                    </div>
+                    <div class="input-wrapper full">
+                        <input type="text" class="text-input" id="inputTitle" value="Wechat 18628065135" placeholder="Subtitle">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下载按钮 (底部) -->
+            <button id="btnDownload" class="btn-download">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
+                <span>Download Card</span>
+            </button>
+        </div>
+
+        <!-- 右侧卡片区域 -->
+        <div class="card-wrapper">
+            <div class="card-container" id="cardBg">
+                <canvas id="canvas" width="700" height="380"></canvas>
+                <div class="card-content" id="cardText">
+                    <div class="card-badge" id="displayBadge">Bytedance</div>
+                    <div class="card-info">
+                        <h2 id="displayName">Xiaoqin Huang</h2>
+                        <p id="displayTitle">Wechat 18628065135</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 保持原有逻辑不变，仅调整尺寸参数
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const cardContainer = document.querySelector('.card-container');
+        const cardText = document.getElementById('cardText');
+
+        const inputBadge = document.getElementById('inputBadge');
+        const inputName = document.getElementById('inputName');
+        const inputTitle = document.getElementById('inputTitle');
+        const displayBadge = document.getElementById('displayBadge');
+        const displayName = document.getElementById('displayName');
+        const displayTitle = document.getElementById('displayTitle');
+
+        const width = 700;
+        const height = 380;
+        let dots = [];
+        let mouse = { x: -9999, y: -9999 };
+        
+        let config = {
+            spacing: 25, // 稍微调密一点适应小尺寸
+            baseSize: 1.8,
+            maxSize: 7,
+            shape: 'circle',
+            scale: 1.0,
+            dotColor: 'rgba(255, 255, 255, 1)'
+        };
+
+        // 形状算法
+        const Shapes = {
+            circle: (nx, ny) => Math.max(0, 1 - Math.sqrt(nx*nx + ny*ny) / config.scale),
+            square: (nx, ny) => Math.max(0, 1 - Math.max(Math.abs(nx), Math.abs(ny)) / config.scale),
+            diamond: (nx, ny) => Math.max(0, 1 - (Math.abs(nx) + Math.abs(ny)) / (config.scale * 1.2)),
+            funnel: (nx, ny) => Math.max(0, 1 - (Math.abs(nx) - Math.abs(ny) * 0.6) / (config.scale * 0.4)),
+            wave: (nx, ny) => (Math.sin(nx * 4 * config.scale + Date.now() * 0.002) + 1) / 2,
+            noise: () => Math.random()
+        };
+
+        class Dot {
+            constructor(x, y) { this.x = x; this.y = y; this.r = 0; this.targetR = 0; }
+            update() {
+                const shapeCx = width * 0.75;
+                const shapeCy = height * 0.5;
+                const nx = (this.x - shapeCx) / (height / 1.5);
+                const ny = (this.y - shapeCy) / (height / 1.5);
+                let intensity = Shapes[config.shape](nx, ny);
+                const dist = Math.sqrt((this.x - mouse.x)**2 + (this.y - mouse.y)**2);
+                const mouseEffect = Math.max(0, 1 - dist / 180);
+                let factor = Math.min(Math.max(intensity + mouseEffect * 0.6, 0), 1);
+                this.targetR = config.baseSize + factor * (config.maxSize - config.baseSize);
+                this.r += (this.targetR - this.r) * 0.1;
+            }
+            draw() {
+                if (this.r < 0.2) return;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                const alpha = (this.r - config.baseSize) / (config.maxSize - config.baseSize);
+                ctx.fillStyle = config.dotColor.replace('1)', `${0.2 + alpha * 0.8})`);
+                ctx.fill();
+            }
+        }
+
+        function createGrid() {
+            dots = [];
+            const cols = Math.ceil(width / config.spacing);
+            const rows = Math.ceil(height / config.spacing);
+            const xOffset = (width - (cols - 1) * config.spacing) / 2;
+            const yOffset = (height - (rows - 1) * config.spacing) / 2;
+            for(let i=0; i<cols; i++) for(let j=0; j<rows; j++) {
+                dots.push(new Dot(xOffset + i * config.spacing, yOffset + j * config.spacing));
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            dots.forEach(dot => { dot.update(); dot.draw(); });
+            requestAnimationFrame(animate);
+        }
+
+        // Interactions
+        inputBadge.addEventListener('input', (e) => displayBadge.innerText = e.target.value);
+        inputName.addEventListener('input', (e) => displayName.innerText = e.target.value);
+        inputTitle.addEventListener('input', (e) => displayTitle.innerText = e.target.value);
+
+        cardContainer.addEventListener('mousemove', (e) => {
+            const rect = cardContainer.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+        cardContainer.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+
+        window.setShape = (shape) => {
+            config.shape = shape;
+            document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${shape}`).classList.add('active');
+        };
+
+        window.setTheme = (theme, el) => {
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+            const bg = document.getElementById('cardBg');
+            
+            const setText = (isDark) => {
+                config.dotColor = isDark ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)';
+                cardText.style.color = isDark ? '#222' : 'white';
+                const badgeBorder = isDark ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)";
+                const badgeBg = isDark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.15)";
+                displayBadge.style.borderColor = badgeBorder;
+                displayBadge.style.background = badgeBg;
+            };
+
+            if(theme === 'black') { bg.style.background = 'linear-gradient(135deg, #1a1a1a, #000)'; setText(false); }
+            else if(theme === 'white') { bg.style.background = '#f0f0f0'; setText(true); }
+            else if(theme === 'orange') { bg.style.background = 'linear-gradient(135deg, #f12711, #f5af19)'; setText(false); }
+            else if(theme === 'purple') { bg.style.background = 'linear-gradient(135deg, #6a11cb, #2575fc)'; setText(false); }
+            else if(theme === 'cyber') { bg.style.background = 'linear-gradient(135deg, #ff00cc, #333399)'; setText(false); }
+            else if(theme === 'ocean') { bg.style.background = 'linear-gradient(135deg, #00c6ff, #0072ff)'; setText(false); }
+            else if(theme === 'forest') { bg.style.background = 'linear-gradient(135deg, #134E5E, #71B280)'; setText(false); }
+            else if(theme === 'crimson') { bg.style.background = 'linear-gradient(135deg, #8E0E00, #1F1C18)'; setText(false); }
+        };
+
+        document.getElementById('densitySlider').addEventListener('input', (e) => {
+            config.spacing = 65 - parseInt(e.target.value); createGrid();
+        });
+        document.getElementById('scaleSlider').addEventListener('input', (e) => config.scale = parseFloat(e.target.value));
+
+        document.getElementById('btnDownload').addEventListener('click', () => {
+            const btn = document.getElementById('btnDownload');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span>Generating...</span>';
+            const prevMouse = { ...mouse };
+            mouse.x = -9999; 
+
+            html2canvas(document.querySelector('.card-container'), {
+                scale: 3,
+                backgroundColor: null,
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                const name = document.getElementById('displayName').innerText.replace(/\s+/g, '_') || 'Card';
+                link.download = `${name}_Card.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                btn.innerHTML = originalText;
+                mouse = prevMouse;
+            });
+        });
+
+        createGrid();
+        animate();
+    </script>
+</body>
+</html>
